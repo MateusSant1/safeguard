@@ -1,0 +1,8 @@
+/* TODO: estilizar. Manter simples -- este é um painel interno, não uma
+   vitrine. Prioridade: o canvas do perímetro ficar exatamente alinhado
+   com a imagem por baixo dele. */
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem;
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Safeguard - Vigilância de Perímetro</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Safeguard</h1>
+
+  <section id="perimetro-section">
+    <h2>Configurar perímetro</h2>
+    <!--
+      TODO: <img id="snapshot" src="/snapshot"> como fundo,
+      <canvas id="perimetro-canvas"> por cima, do MESMO tamanho da imagem,
+      para o usuário clicar os vértices do polígono.
+    -->
+    <canvas id="perimetro-canvas"></canvas>
+    <button id="salvar-perimetro">Salvar perímetro</button>
+    <button id="perimetro-total">Monitorar imagem inteira</button>
+  </section>
+
+  <section id="stream-section">
+    <h2>Câmera ao vivo</h2>
+    <!-- TODO: <img src="/video_feed"> para o stream MJPEG -->
+  </section>
+
+  <section id="eventos-section">
+    <h2>Histórico de eventos</h2>
+    <ul id="lista-eventos"><!-- TODO: preenchido via events.js --></ul>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="perimeter.js"></script>
+  <script src="events.js"></script>
+</body>
+</html>
