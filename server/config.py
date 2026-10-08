@@ -66,3 +66,5 @@ EVENTS_LIST_LIMIT = 50
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# Usa só IPv4 para falar com o Telegram (redes com IPv6 quebrado dão ReadTimeout).
+TELEGRAM_FORCE_IPV4 = os.getenv("TELEGRAM_FORCE_IPV4", "1").lower() not in ("0", "false", "no")

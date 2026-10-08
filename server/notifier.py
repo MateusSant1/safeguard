@@ -9,14 +9,23 @@ levantamos um RuntimeError só com o código HTTP e a descrição do Telegram.
 """
 import json
 import logging
+import socket
 from contextlib import ExitStack
 from pathlib import Path
 
 import requests
+import urllib3.util.connection
 
-from server.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from server.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_FORCE_IPV4
 
 logger = logging.getLogger(__name__)
+
+# Em redes com IPv6 quebrado (visto no PC de desenvolvimento), o requests
+# tenta o IPv6 do api.telegram.org primeiro, a conexão trava e dá
+# ReadTimeout. Forçar IPv4 resolve. Vale para o processo todo, mas o
+# requests só é usado aqui.
+if TELEGRAM_FORCE_IPV4:
+    urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 
 API_URL = "https://api.telegram.org/bot{token}/{method}"
 MAX_ALBUM_SIZE = 10  # limite do sendMediaGroup
@@ -24,7 +33,8 @@ CAPTION_LIMIT = 1024  # limite de legenda do Telegram
 TIMEOUT = (5, 30)  # (conexão, leitura) em segundos
 
 
-def _call(method: str, data: dict, files: dict) -> None:
+def _call(method: str, data: dict, files: dict | None = None):
+    """Chama um método da Bot API e devolve o campo "result" da resposta."""
     url = API_URL.format(token=TELEGRAM_BOT_TOKEN, method=method)
     try:
         resp = requests.post(url, data=data, files=files, timeout=TIMEOUT)
@@ -40,6 +50,28 @@ def _call(method: str, data: dict, files: dict) -> None:
     if resp.status_code != 200 or not body.get("ok"):
         descricao = body.get("description", "sem descrição")
         raise RuntimeError(f"Telegram recusou {method}: HTTP {resp.status_code} - {descricao}")
+    return body.get("result")
+
+
+def find_chats() -> list[dict]:
+    """
+    Lista os chats que mandaram mensagem recentemente para o bot (via
+    getUpdates) -- serve para descobrir o TELEGRAM_CHAT_ID. Só precisa do
+    TELEGRAM_BOT_TOKEN. Cada item: {"id", "tipo", "nome"}.
+    """
+    if not TELEGRAM_BOT_TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN precisa estar definido no .env.")
+
+    chats: dict[int, dict] = {}
+    for update in _call("getUpdates", {}) or []:
+        mensagem = update.get("message") or update.get("channel_post") or {}
+        chat = mensagem.get("chat")
+        if chat:
+            nome = chat.get("title") or " ".join(
+                filter(None, [chat.get("first_name"), chat.get("last_name")])
+            )
+            chats[chat["id"]] = {"id": chat["id"], "tipo": chat.get("type"), "nome": nome}
+    return list(chats.values())
 
 
 def send_alert(image_paths: list[Path], caption: str = "Invasão detectada!") -> None:
