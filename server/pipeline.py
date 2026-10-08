@@ -45,7 +45,7 @@ from server.perimeter import (
 
 if TYPE_CHECKING:
     from server.camera import Camera
-    from server.event_recorder import EventRecorder
+    from server.event_recorder import EventRecorder, PendingEvent
     from server.motion_detector import MotionDetector
     from server.object_detector import ObjectDetector
 
@@ -107,6 +107,9 @@ class Pipeline:
 
         self._last_event_ts = 0.0
         self._last_event_id: str | None = None
+        # Evento em gravação (as fotos são salvas ao longo dos frames seguintes).
+        self._pending: "PendingEvent | None" = None
+        self._pending_caption = ""
 
     # ------------------------------------------------------------------
     # Ciclo de vida
@@ -260,6 +263,12 @@ class Pipeline:
             self._error = str(e)
             logger.exception("Pipeline interrompido por erro.")
         finally:
+            if self._pending is not None:
+                logger.warning(
+                    "Loop encerrado com o evento %s incompleto (%d imagem(ns)); não notificado.",
+                    self._pending.event_id, len(self._pending.paths),
+                )
+                self._pending = None
             logger.info("Loop do pipeline encerrado.")
 
     def _process(self, frame: np.ndarray) -> None:
@@ -289,28 +298,41 @@ class Pipeline:
             frame, self._annotate(frame, movimento, pessoas, animais, em_cooldown, agora)
         )
 
-        if invasao and not em_cooldown:
-            self._handle_intrusion(frame, len(pessoas), agora)
+        if self._pending is not None:
+            # Evento em gravação: este frame pode virar a próxima foto.
+            try:
+                completo = self._pending.offer(frame)
+            except Exception:
+                logger.exception("Falha ao salvar frame do evento.")
+                completo = True
+            if completo:
+                self._finish_event()
+        elif invasao and not em_cooldown:
+            self._start_event(frame, len(pessoas), agora)
 
-    def _handle_intrusion(self, frame: np.ndarray, num_pessoas: int, agora: float) -> None:
-        # O cooldown começa antes da captura: se ela falhar, não tentamos
+    def _start_event(self, frame: np.ndarray, num_pessoas: int, agora: float) -> None:
+        # O cooldown começa na detecção: se a gravação falhar, não tentamos
         # de novo a cada frame.
         self._last_event_ts = agora
-        logger.info("INVASÃO detectada (%d pessoa(s) no frame) -- capturando evento.", num_pessoas)
-
+        self._pending_caption = f"Invasão detectada! {datetime.now():%d/%m/%Y %H:%M:%S}"
+        logger.info("INVASÃO detectada (%d pessoa(s) no frame) -- gravando evento.", num_pessoas)
         try:
-            caminhos = self._recorder.capture_event(self._camera, first_frame=frame)
+            self._pending = self._recorder.start_event(frame)
         except Exception:
-            logger.exception("Falha ao capturar o evento.")
-            return
+            logger.exception("Falha ao iniciar a gravação do evento.")
+
+    def _finish_event(self) -> None:
+        """Evento completo: avisa o Telegram e os navegadores conectados."""
+        evento, self._pending = self._pending, None
+        caminhos = evento.paths
         if not caminhos:
-            logger.warning("capture_event não salvou nenhuma imagem.")
+            logger.warning("O evento %s não salvou nenhuma imagem.", evento.event_id)
             return
 
-        event_id = caminhos[0].parent.name
+        event_id = evento.event_id
         self._last_event_id = event_id
-        legenda = f"Invasão detectada! {datetime.now():%d/%m/%Y %H:%M:%S}"
-        logger.info("%d imagem(ns) salvas em %s.", len(caminhos), caminhos[0].parent)
+        legenda = self._pending_caption
+        logger.info("%d imagem(ns) salvas em %s.", len(caminhos), evento.event_dir)
 
         # Rede lenta não pode travar a leitura da câmera: envia em outra thread.
         if self._notify is not None:
@@ -390,7 +412,9 @@ class Pipeline:
             linha2 = "movimento sem pessoa"
         else:
             linha2 = ""
-        if em_cooldown:
+        if self._pending is not None:
+            linha2 += f"  [gravando evento: {len(self._pending.paths)} foto(s)]"
+        elif em_cooldown:
             restante = self._cooldown - (agora - self._last_event_ts)
             linha2 += f"  (cooldown: {restante:.0f}s)"
         _put_text(img, linha1, (10, 25), (255, 255, 255), 0.6)

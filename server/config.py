@@ -51,7 +51,10 @@ MIN_OVERLAP_RATIO = float(os.getenv("MIN_OVERLAP_RATIO", "0.15"))
 # --- Eventos (capturas de invasão) ---
 EVENTS_DIR = BASE_DIR / "events"
 FRAMES_PER_EVENT = 5
-NOTIFICATION_COOLDOWN_SECONDS = 60
+# Intervalo entre as fotos de um mesmo evento (5 fotos x 1 s = ~4 s de cena).
+EVENT_FRAME_INTERVAL_SECONDS = float(os.getenv("EVENT_FRAME_INTERVAL_SECONDS", "1.0"))
+# Espera mínima entre dois eventos (e duas notificações).
+NOTIFICATION_COOLDOWN_SECONDS = int(os.getenv("NOTIFICATION_COOLDOWN_SECONDS", "60"))
 
 # --- Servidor web ---
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
