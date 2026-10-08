@@ -1,6 +1,6 @@
 # Safeguard — Contexto completo do projeto
 
-Exportado em 07/10/2026. Este arquivo resume a conversa em que o projeto foi planejado e desenvolvido, de 02/09 a 07/10/2026: o que foi decidido, o que já funciona, o que não funciona, o que já deu errado e como foi resolvido. Serve para qualquer pessoa do grupo continuar o trabalho em outro chat sem precisar reconstruir esse histórico. O código atual está no Apêndice A.
+Exportado em 07/10/2026; seções 4 e 6 a 10 atualizadas em 08/10/2026. Este arquivo resume a conversa em que o projeto foi planejado e desenvolvido, de 02/09 a 08/10/2026: o que foi decidido, o que já funciona, o que não funciona, o que já deu errado e como foi resolvido. Serve para qualquer pessoa do grupo continuar o trabalho em outro chat sem precisar reconstruir esse histórico. O Apêndice A é um retrato do código em 07/10; o código atual está no repositório (branch `pipeline-raspberry`).
 
 ## Como usar este arquivo
 
@@ -105,9 +105,9 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 | Perímetro | `cv2.pointPolygonTest`, `cv2.fillPoly` | Em uso |
 | Números | NumPy | Em uso |
 | Configuração | `python-dotenv` | Em uso |
-| Servidor web | Flask + Flask-SocketIO, vídeo em MJPEG | Planejado |
-| Notificação | Bot API do Telegram com `requests` | Planejado |
-| Cliente | HTML, CSS e JavaScript puro, `<canvas>` para o perímetro, Socket.IO no navegador | Planejado |
+| Servidor web | Flask + Flask-SocketIO, vídeo em MJPEG | Em uso |
+| Notificação | Bot API do Telegram com `requests` | Em uso |
+| Cliente | HTML, CSS e JavaScript puro, `<canvas>` para o perímetro, Socket.IO no navegador | Em uso |
 
 ---
 
@@ -140,6 +140,7 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 - **30/09** — Criado o `ESTADO_DO_PROJETO.md` para o grupo.
 - **05/10** — Relatório preenchido da seção 8.2 à 13; sensor de presença removido de todo o relatório; referências reduzidas às documentações das bibliotecas.
 - **07/10** — Este arquivo. Descoberto que os arquivos de código no GitHub estavam vazios. Criados os scripts de instalação no Raspberry Pi, e todo o código foi enviado para a branch `pipeline-raspberry`.
+- **08/10** — Implementados `pipeline.py`, `app.py`, `notifier.py` e o cliente web, e validados com a webcam real e o bot real. Limiares movidos para o `config.py`. Problemas 1 e 2 resolvidos: a decisão passou a usar a sobreposição caixa × polígono (`overlap` ≥ 0.15), e o `event_recorder` grava normalmente quando a condição de disparo é atendida. As fotos do evento passaram a ter 1 s de intervalo, gravadas sem travar o loop. O Telegram dava `ReadTimeout` por causa do IPv6 quebrado na rede do PC; o `notifier` passou a forçar IPv4.
 
 ---
 
@@ -151,9 +152,11 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 | `perimeter.py` | Funcional isoladamente | Webcam real, perímetro de teste desenhado (`test_integration`) |
 | `motion_detector.py` | Funcional, inclusive restrito ao perímetro | Webcam real (`test_motion`); perto da borda do perímetro é preciso um movimento maior para disparar, o que é esperado |
 | `object_detector.py` | Detecta pessoas com limiar 0.26 | Webcam real (`test_object`) |
-| Perímetro + detecção de pessoas | **Não funcional** | Ver problema 1 |
-| `event_recorder.py` | Passou no teste sintético, **não grava no pipeline real** | Ver problema 2 |
-| `app.py`, `notifier.py`, `client/` | Esqueletos, só com TODOs | — |
+| Perímetro + detecção de pessoas | Funcional no modo `overlap` (0.15) | Webcam real, perímetro desenhado no navegador; overlap na borda entre 0.26 e 0.37 |
+| `event_recorder.py` | Funcional: 5 imagens, 1 s entre elas, sem travar o loop | Webcam real |
+| `pipeline.py`, `app.py` | Funcionais | Webcam real, pelo navegador (`python -m server.app`) |
+| `notifier.py` | Funcional | Bot real (`python -m server.test_telegram`) |
+| `client/` | Funcional: vídeo ao vivo, editor do perímetro, histórico, alerta em tempo real | Navegador no PC de desenvolvimento |
 
 **Repositório no GitHub:** até 07/10/2026 a `main` tinha 7 commits com todos os arquivos de `server/` e `client/` **vazios (0 bytes)**, inclusive um `server/data/perimeter.json` vazio. Em 07/10 todo o código desta conversa foi enviado para a branch **`pipeline-raspberry`**. A `main` continua vazia até a branch ser mesclada; até lá, clone com `git clone -b pipeline-raspberry ...`.
 
@@ -167,24 +170,16 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 
 ## 8. Problemas em aberto
 
-### Problema 1 — A decisão do perímetro não corresponde à posição real da pessoa
+### Resolvidos em 08/10
 
-**O que foi observado:** com o perímetro de teste salvo e visível na tela, o `test_object` classifica a pessoa como dentro ou fora sem bater com onde ela está. Com o limiar baixo, o modelo costuma enquadrar só cabeça e tronco ("detecta só o rosto"). Antes, a hipótese de imagem espelhada foi descartada: o Mateus observou a posição na própria janela do teste.
+- **Problema 1 — decisão do perímetro.** Nos testes, com a pessoa perto da webcam, as pernas nem aparecem na imagem: a caixa pega só o tronco e o `foot_point` não representa a posição da pessoa. Adotada a correção (a): a pessoa está dentro quando pelo menos 15% da caixa cai dentro do polígono (`DECISION_MODE=overlap`, `MIN_OVERLAP_RATIO=0.15`). Os modos `foot` e `center` continuam disponíveis pelo `.env`. Atenção ao testar: se a pessoa cruzar a linha do perímetro, a caixa sempre terá overlap suficiente.
+- **Problema 2 — `event_recorder`.** O gravador não tinha defeito; ele não era acionado por causa do problema 1.
 
-**Hipótese:** como a caixa cobre só a parte de cima do corpo, a base dela (o `foot_point`) fica na altura do pescoço ou do peito, e não dos pés. O teste geométrico em si (`point_inside_perimeter`) foi validado várias vezes com dados sintéticos e com a webcam real.
+### Pendentes
 
-**Como confirmar:** no `test_object.py`, imprimir para cada detecção a altura da caixa em relação à altura da imagem e a posição do `foot_point`, e ver onde o ponto cai em relação ao polígono enquanto alguém anda para dentro e para fora.
-
-**Correções candidatas, depois de confirmar:**
-- (a) considerar "dentro" se a **caixa intersectar o polígono** numa fração mínima da área dela. É a opção mais robusta para detecções parciais;
-- (b) usar o centro da caixa no lugar da base;
-- (c) estimar a posição dos pés prolongando a caixa para baixo, com uma proporção aproximada do corpo.
-
-### Problema 2 — O `event_recorder` não grava no pipeline real
-
-**Hipótese:** no `test_pipeline.py`, a gravação só é chamada quando há movimento **e** uma pessoa com o ponto dentro do polígono no mesmo frame. Se o problema 1 impede essa condição, o gravador nunca é acionado.
-
-**Como isolar:** abrir a câmera e chamar `EventRecorder().capture_event(cam)` diretamente, conferindo se as imagens aparecem em `server/events/`. Se aparecerem, o problema é só a condição de disparo, e ele se resolve junto com o problema 1.
+- **Calibração de longe.** O limiar 0.15 foi validado com a pessoa perto da webcam; falta testar com a pessoa distante, de corpo inteiro.
+- **Animais.** O vídeo mostra animais como caixas cinza "ignorado" e eles nunca disparam evento, mas ainda não houve teste com um animal real.
+- **Desempenho no Pi 3.** Ainda não medido.
 
 ### Limitações conhecidas (aceitas)
 
@@ -208,6 +203,9 @@ Se algum destes erros aparecer de novo, a causa e a solução já são conhecida
 | `module 'cv2.dnn' has no attribute 'readNetFromCaffe'` | `pip` instalou o OpenCV 5.0, que removeu o suporte a Caffe | Windows: `pip install "opencv-python<5"`; Pi: OpenCV do apt |
 | `blobs.size() >= 2` no `net.forward()` | Prototxt e caffemodel de fontes diferentes | Baixar os dois da mesma fonte (PINTO0309) |
 | Poucas detecções, só com o rosto visível | Limiar 0.5 alto demais para esse modelo | Limiar 0.26 |
+| Perímetro "não discerne": pessoa sempre dentro | Pessoa perto da câmera cruzando a linha do perímetro; a caixa sempre tem overlap ≥ 0.15 | Testar com a pessoa inteira de um lado da linha; conferir o `overlap` mostrado no vídeo |
+| `MOVIMENTO` aparece mesmo com a pessoa fora do perímetro | É só o estágio 1 (MOG2): corpo, sombra e ajuste automático de brilho da webcam | Esperado; evento exige uma caixa `person` dentro |
+| `ERRO: Falha de rede ao chamar o Telegram (ReadTimeout)` | IPv6 configurado na rede, mas sem saída; o `requests` tentava o IPv6 primeiro | `notifier.py` força IPv4 (`TELEGRAM_FORCE_IPV4=1`, padrão) |
 
 ---
 
@@ -215,15 +213,10 @@ Se algum destes erros aparecer de novo, a causa e a solução já são conhecida
 
 | # | Tarefa |
 |---|---|
-| 0 | Mesclar a branch `pipeline-raspberry` na `main` (pull request no GitHub) |
-| 1 | Confirmar e corrigir o problema 1 (ponto dos pés × perímetro) |
-| 2 | Confirmar que o `event_recorder` grava quando chamado direto (problema 2) |
-| 3 | Mover `CONFIDENCE_THRESHOLD` (0.26) e `MOTION_THRESHOLD_AREA` (500) para o `config.py`; hoje eles estão repetidos nos scripts de teste |
-| 4 | Instalar no Pi com `scripts/setup_raspberry_pi.sh` e rodar o `test_integration` lá |
-| 5 | Implementar o `app.py`: rotas, streaming MJPEG e o loop do pipeline numa thread |
-| 6 | Implementar o cliente: canvas para desenhar o perímetro e enviar os pontos normalizados; histórico de eventos |
-| 7 | Criar o bot no Telegram (@BotFather), descobrir o chat_id e implementar o `notifier.py` |
-| 8 | Teste completo no Pi; prints e vídeo para o relatório (seções 9 e 13) |
+| 1 | Testar a calibração do overlap com a pessoa distante e, se possível, com um animal |
+| 2 | Instalar no Pi com `scripts/setup_raspberry_pi.sh` e rodar `python -m server.app` lá, medindo o desempenho |
+| 3 | Mesclar a branch `pipeline-raspberry` na `main` (pull request no GitHub) |
+| 4 | Teste completo no Pi; prints e vídeo para o relatório (seções 9 e 13) |
 
 ---
 
@@ -285,9 +278,11 @@ bash scripts/setup_raspberry_pi.sh
 
 ---
 
-## Apêndice A — Código atual
+## Apêndice A — Código em 07/10/2026
 
-Versão mais recente de cada arquivo, igual à do `safeguard_repositorio.zip`. Ela inclui as duas correções feitas no computador do Mateus: leitura com `utf-8-sig` no `perimeter.py` e limiar 0.26 nos testes. Se a cópia local de alguém tiver mudanças posteriores, a cópia local vale.
+> **Desatualizado:** este apêndice é o retrato de 07/10, antes do `pipeline.py`, do `app.py`, do `notifier.py` e do cliente serem implementados. O código atual está no repositório (branch `pipeline-raspberry`); consulte-o lá.
+
+Versão de cada arquivo em 07/10, igual à do `safeguard_repositorio.zip`. Ela inclui as duas correções feitas no computador do Mateus: leitura com `utf-8-sig` no `perimeter.py` e limiar 0.26 nos testes. Se a cópia local de alguém tiver mudanças posteriores, a cópia local vale.
 
 O `server/__init__.py` existe e é vazio (marca `server/` como pacote).
 

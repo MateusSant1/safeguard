@@ -2,7 +2,7 @@
 
 Documento de referência do time para o projeto da disciplina Tópicos Especiais em Computação (Prof. Felipe dos Anjos). Ele descreve o que já existe, o que falta, quais tecnologias usamos e como o código está organizado. Atualize a seção de estado sempre que um módulo mudar de situação.
 
-**Última atualização:** 07/10/2026. O estado dos módulos é o dos últimos testes registrados com webcam real.
+**Última atualização:** 08/10/2026. O estado dos módulos é o dos últimos testes registrados com webcam real.
 
 Documentos relacionados: `docs/CONTEXTO_SAFEGUARD.md` (histórico e decisões, para continuar o projeto em outros chats) e `docs/INSTALACAO_RASPBERRY_PI.md` (instalação no Pi).
 
@@ -26,8 +26,8 @@ O processamento é dividido em dois estágios para caber no poder de processamen
 flowchart LR
     CAM[Webcam] --> MOV[Estágio 1<br/>Detecção de movimento<br/>MOG2, restrita ao perímetro]
     MOV -- houve movimento --> DET[Estágio 2<br/>Detecção de pessoas<br/>MobileNet-SSD]
-    DET -- pessoa detectada --> PER{Pés da pessoa<br/>dentro do perímetro?}
-    PER -- sim --> REC[Grava ~5 imagens<br/>do evento]
+    DET -- pessoa detectada --> PER{Caixa da pessoa<br/>dentro do perímetro?<br/>overlap ≥ 15%}
+    PER -- sim --> REC[Grava 5 imagens<br/>do evento, 1 s entre elas]
     REC --> TG[Notificação<br/>Telegram]
     CLI[Cliente web] -. desenha e salva o perímetro .-> JSON[(perimeter.json)]
     JSON -.-> MOV
@@ -38,9 +38,11 @@ flowchart LR
 
 **Estágio 2 — pessoas.** Quando há movimento, o frame passa por uma rede neural pré-treinada (MobileNet-SSD) que localiza objetos e os classifica. Só as detecções da classe "pessoa" acima de um limiar de confiança seguem adiante.
 
-**Decisão.** Para cada pessoa, o sistema pega o ponto central da base da caixa detectada (uma aproximação da posição dos pés) e testa se ele está dentro do polígono do perímetro.
+**Decisão.** Para cada pessoa, o sistema calcula que fração da caixa detectada cai dentro do polígono (modo `overlap`) e considera a pessoa dentro quando essa fração é de pelo menos 15%. O critério original, que testava só o ponto central da base da caixa (os "pés"), falhava quando o modelo enquadrava apenas o tronco; ele continua disponível com `DECISION_MODE=foot`, assim como o centro da caixa (`DECISION_MODE=center`).
 
-**Evento.** Se estiver dentro, o sistema grava cerca de 5 imagens em sequência e, futuramente, as envia pelo Telegram. Um intervalo de espera (cooldown) de 60 segundos impede que a mesma invasão gere várias notificações seguidas.
+**Evento.** Se estiver dentro, o sistema grava 5 imagens, com 1 segundo entre elas (a primeira é o próprio frame da detecção), e as envia pelo Telegram como um álbum. As imagens são gravadas ao longo dos frames seguintes do loop, então o vídeo e a detecção não param durante a gravação. Um intervalo de espera (cooldown) de 60 segundos impede que a mesma invasão gere várias notificações seguidas.
+
+**Servidor e cliente.** O `pipeline.py` roda esse loop em uma thread e é o único que lê a câmera; o `app.py` (Flask + Flask-SocketIO) serve o cliente web, o vídeo ao vivo com as anotações e a API do perímetro e dos eventos, e avisa os navegadores conectados a cada invasão.
 
 **Perímetro.** Os pontos do polígono são salvos em `server/data/perimeter.json` em coordenadas normalizadas, ou seja, como frações de 0.0 a 1.0 da largura e da altura da imagem. Isso permite que o perímetro desenhado em uma resolução (no navegador) funcione corretamente em outra (na inferência). Se o arquivo não existir ou estiver inválido, o sistema vigia a imagem inteira.
 
@@ -57,11 +59,11 @@ flowchart LR
 | Geometria do perímetro | `cv2.pointPolygonTest`, `cv2.fillPoly` | Em uso |
 | Cálculo numérico | NumPy | Em uso |
 | Configuração | `python-dotenv` (variáveis em `.env`) | Em uso |
-| Servidor web / API | Flask + Flask-SocketIO | Planejado |
-| Streaming de vídeo | MJPEG via Flask | Planejado |
-| Notificação | Bot API do Telegram, chamada com `requests` | Planejado |
-| Cliente | HTML, CSS e JavaScript puro, com `<canvas>` para desenhar o perímetro | Planejado |
-| Tempo real no cliente | Socket.IO (cliente JavaScript) | Planejado |
+| Servidor web / API | Flask + Flask-SocketIO | Em uso |
+| Streaming de vídeo | MJPEG via Flask | Em uso |
+| Notificação | Bot API do Telegram, chamada com `requests` | Em uso |
+| Cliente | HTML, CSS e JavaScript puro, com `<canvas>` para desenhar o perímetro | Em uso |
+| Tempo real no cliente | Socket.IO (cliente JavaScript, via CDN; sem internet, o cliente consulta a API periodicamente) | Em uso |
 | Hardware do servidor | Raspberry Pi 3 com Raspberry Pi OS | Configurado, ainda sem o código instalado |
 | Câmera | Webcam USB | Em uso |
 | Versionamento | Git + GitHub (`MateusSant1/safeguard`) | Em uso |
@@ -78,19 +80,22 @@ Sobre a versão do OpenCV: o OpenCV 5.0 removeu o suporte a modelos Caffe, que �
 | `perimeter.py` | Funcional isoladamente | Webcam real com perímetro de teste desenhado (`test_integration.py`) |
 | `motion_detector.py` | Funcional | Webcam real, com e sem máscara do perímetro (`test_motion.py`) |
 | `object_detector.py` | Detecta pessoas com limiar 0.26 | Webcam real (`test_object.py`) |
-| Perímetro + detecção de pessoas | **Não funcional** | Ver problema 1 |
-| `event_recorder.py` | Passou em teste sintético, **não captura no pipeline real** | Ver problema 2 |
-| `app.py` | Implementado (08/10), validado só com câmera simulada | Rodar com a webcam |
-| `notifier.py` | Implementado (08/10), validado só com `requests` simulado | Testar com o bot real |
-| `client/` | Esqueleto (apenas TODOs) | — |
+| Perímetro + detecção de pessoas | Funcional no modo `overlap` (limiar 0.15) | Webcam real, perímetro desenhado no navegador; overlap na borda entre 0.26 e 0.37 |
+| `event_recorder.py` | Funcional: 5 imagens, 1 s entre elas, sem travar o loop | Webcam real (`python -m server.app`) |
+| `pipeline.py` | Funcional | Webcam real |
+| `app.py` | Funcional | Webcam real, pelo navegador |
+| `notifier.py` | Funcional | Bot real (`test_telegram.py`) |
+| `client/` | Funcional: vídeo ao vivo, editor do perímetro, histórico e alerta em tempo real | Navegador no PC de desenvolvimento |
 
 ### Problemas conhecidos
 
-**1. O teste do perímetro não corresponde à posição real da pessoa.** Com o limiar de confiança baixo, o modelo muitas vezes enquadra só a parte de cima do corpo (cabeça e tronco). Como o ponto testado contra o perímetro é a base da caixa, ele acaba na altura do pescoço ou do peito, e não dos pés. A hipótese ainda precisa ser confirmada: o próximo passo é desenhar a caixa e o ponto no `test_object.py` e observar onde eles caem em relação ao polígono. Se for isso, as alternativas são testar o centro da caixa ou verificar se a caixa inteira intersecta o polígono.
+**1. Calibração só de perto.** O limiar de overlap (0.15) foi validado com a pessoa perto da webcam, ocupando boa parte da imagem. Falta testar com a pessoa mais distante, de corpo inteiro, que é a situação real de vigilância. O vídeo ao vivo mostra o `overlap` de cada pessoa para ajudar nessa calibração (`MIN_OVERLAP_RATIO` no `.env`).
 
-**2. O `event_recorder` não chega a gravar no pipeline.** No `test_pipeline.py`, ele só é chamado quando existe movimento e uma pessoa com o ponto dentro do perímetro no mesmo frame. Se o problema 1 impede essa condição, o gravador nunca é acionado, o que indicaria que ele próprio não tem defeito. Para isolar, basta abrir a câmera e chamar `EventRecorder().capture_event(cam)` diretamente, conferindo se as imagens aparecem em `server/events/`.
+**2. Animais ainda não testados.** O vídeo mostra animais detectados como caixas cinza "ignorado", e eles nunca disparam evento, mas isso ainda não foi verificado com um animal de verdade na cena.
 
-**3. Limitações do modelo.** O MobileNet-SSD é de 2017 e foi treinado em um conjunto de dados pequeno. Ele perde a detecção em movimentos bruscos (por causa do desfoque) e depende bastante de a pessoa estar de frente e bem enquadrada. O detector também não faz rastreamento: cada frame é analisado do zero. Isso é aceitável para o escopo do projeto, e a troca por um modelo mais moderno (YOLO exportado para ONNX) fica registrada como possível melhoria.
+**3. IPv6 quebrado no PC de desenvolvimento.** O `requests` tentava o IPv6 do `api.telegram.org` primeiro e terminava em `ReadTimeout`. O `notifier.py` agora usa só IPv4 (`TELEGRAM_FORCE_IPV4=1`, o padrão).
+
+**4. Limitações do modelo.** O MobileNet-SSD é de 2017 e foi treinado em um conjunto de dados pequeno. Ele perde a detecção em movimentos bruscos (por causa do desfoque) e depende bastante de a pessoa estar de frente e bem enquadrada. O detector também não faz rastreamento: cada frame é analisado do zero. Isso é aceitável para o escopo do projeto, e a troca por um modelo mais moderno (YOLO exportado para ONNX) fica registrada como possível melhoria.
 
 ---
 
@@ -132,16 +137,17 @@ safeguard/
 │   ├── test_motion.py      # teste manual ao vivo: movimento
 │   ├── test_object.py      # teste manual ao vivo: detecção de pessoas
 │   ├── test_pipeline.py    # teste manual ao vivo: pipeline completo sem Telegram
+│   ├── test_telegram.py    # teste do Telegram sem câmera; descobre o chat_id
 │   │
 │   ├── models/             # MobileNetSSD_deploy.prototxt e .caffemodel (~22 MB)
 │   ├── data/               # perimeter.json
 │   └── events/             # imagens das invasões (ignorado pelo Git)
 │
-└── client/                 # interface web (esqueleto)
-    ├── index.html          # câmera + canvas do perímetro + histórico
+└── client/                 # interface web, servida pelo app.py em http://<servidor>:5000
+    ├── index.html          # vídeo ao vivo + editor do perímetro + histórico
     ├── style.css
     ├── perimeter.js        # desenho do polígono e envio dos pontos normalizados
-    └── events.js           # histórico de eventos em tempo real
+    └── events.js           # estado do pipeline, histórico e alerta em tempo real
 ```
 
 Nenhum módulo além de `camera.py` deve abrir a câmera diretamente, para que trocar a webcam pela câmera do Raspberry Pi exija mudança em um arquivo só.
@@ -175,6 +181,28 @@ Invoke-WebRequest -Uri "$base/MobileNetSSD_deploy.caffemodel" -OutFile "server\m
 
 O `.caffemodel` deve ter cerca de 22 MB.
 
+### Sistema completo
+
+```powershell
+python -m server.app
+```
+
+Abra **http://localhost:5000** (ou `http://<IP do computador>:5000` em outro dispositivo da mesma rede). Fique fora do enquadramento ao iniciar: nos primeiros 30 frames o detector de movimento aprende o fundo da cena.
+
+- **Monitoramento ao vivo:** amarelo = movimento dentro do perímetro; caixa vermelha = pessoa dentro; verde = pessoa fora; cinza = animal (ignorado). Cada pessoa mostra a confiança e o `overlap`.
+- **Perímetro:** clique para adicionar vértices, arraste para mover, botão direito remove; "Salvar perímetro" aplica na hora, sem reiniciar.
+- **Histórico:** eventos com miniaturas; um aviso vermelho aparece a cada invasão.
+
+Sem `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` no `.env`, os eventos são só salvos (um aviso aparece no log ao iniciar).
+
+### Telegram
+
+```powershell
+python -m server.test_telegram
+```
+
+Sem token, explica como criar o bot no @BotFather; com token e sem chat_id, lista os chats que falaram com o bot (para copiar o `TELEGRAM_CHAT_ID`); com os dois, envia as imagens do evento mais recente.
+
 ### Testes manuais
 
 Todos os scripts são executados **da raiz do projeto** e **como módulo** (com `-m` e ponto no lugar da barra). Rodar como arquivo (`python server/test_motion.py`) quebra os imports do pacote `server`.
@@ -205,17 +233,19 @@ As variáveis de ambiente ficam no arquivo `.env` (copiado de `.env.example` e n
 | `TELEGRAM_BOT_TOKEN` | Token do bot, gerado pelo @BotFather |
 | `TELEGRAM_CHAT_ID` | Chat que recebe as notificações |
 
-Os parâmetros ajustáveis do pipeline, com os valores em uso:
+Os parâmetros ajustáveis do pipeline ficam todos no `config.py`, com valor padrão que pode ser trocado pelo `.env` (ver `.env.example`):
 
-| Parâmetro | Valor | Onde está hoje |
+| Variável | Padrão | Uso |
 |---|---|---|
-| Limiar de confiança para pessoas | 0.26 | `test_object.py`, `test_pipeline.py` |
-| Área mínima de movimento | 500 px | `test_motion.py`, `test_pipeline.py` |
-| Frames de aquecimento do MOG2 | 30 | scripts de teste |
-| Imagens por evento | 5 | `config.py` |
-| Cooldown entre eventos | 60 s | `config.py` |
-
-Os dois primeiros ainda estão repetidos nos scripts de teste e devem ser movidos para o `config.py`.
+| `CONFIDENCE_THRESHOLD` | 0.26 | Confiança mínima para aceitar uma pessoa |
+| `MOTION_THRESHOLD_AREA` | 500 px | Área mínima de movimento para acionar o estágio 2 |
+| `WARM_UP_FRAMES` | 30 | Frames para o MOG2 aprender o fundo ao iniciar |
+| `DECISION_MODE` | `overlap` | Critério dentro/fora: `overlap`, `foot` ou `center` |
+| `MIN_OVERLAP_RATIO` | 0.15 | Fração mínima da caixa dentro do polígono (modo `overlap`) |
+| `EVENT_FRAME_INTERVAL_SECONDS` | 1.0 | Intervalo entre as 5 imagens de um evento |
+| `NOTIFICATION_COOLDOWN_SECONDS` | 60 | Espera mínima entre dois eventos |
+| `TELEGRAM_FORCE_IPV4` | 1 | Usa só IPv4 para falar com o Telegram |
+| `SERVER_HOST` / `SERVER_PORT` | 0.0.0.0 / 5000 | Endereço do servidor web |
 
 ---
 
@@ -223,10 +253,7 @@ Os dois primeiros ainda estão repetidos nos scripts de teste e devem ser movido
 
 | Ordem | Tarefa |
 |---|---|
-| 1 | Confirmar e corrigir o problema do ponto testado contra o perímetro (problema 1) |
-| 2 | Confirmar que o `event_recorder` grava quando chamado diretamente (problema 2) |
-| 3 | Centralizar os limiares no `config.py` |
-| 4 | Implementar o `app.py`: rotas `/snapshot`, `/video_feed`, `/api/perimetro`, `/api/eventos` e o loop do pipeline em uma thread separada |
-| 5 | Implementar o cliente: canvas para desenhar o perímetro, enviando pontos normalizados |
-| 6 | Criar o bot no Telegram e implementar o `notifier.py` |
-| 7 | Instalar e testar no Raspberry Pi 3 com `scripts/setup_raspberry_pi.sh` (ver `docs/INSTALACAO_RASPBERRY_PI.md`) |
+| 1 | Testar a calibração com a pessoa distante, de corpo inteiro (problema 1) |
+| 2 | Testar com um animal real na cena (problema 2) |
+| 3 | Instalar e testar no Raspberry Pi 3 com `scripts/setup_raspberry_pi.sh` (ver `docs/INSTALACAO_RASPBERRY_PI.md`), medindo o desempenho do loop |
+| 4 | Mesclar a branch `pipeline-raspberry` na `main` |
