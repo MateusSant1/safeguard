@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Safeguard - Vigilância de Perímetro</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Safeguard</h1>
+    <span id="status" class="pill">conectando...</span>
+  </header>
+
+  <div id="alerta" class="alerta" hidden></div>
+
+  <main>
+    <section id="stream-section">
+      <h2>Monitoramento ao vivo</h2>
+      <div class="quadro">
+        <img id="video" src="/video_feed" alt="Câmera ao vivo" />
+      </div>
+      <p class="legenda">
+        Amarelo: movimento dentro do perímetro &middot;
+        Vermelho: pessoa dentro &middot; Verde: pessoa fora &middot;
+        Cinza: animal (ignorado)
+      </p>
+    </section>
+
+    <section id="perimetro-section">
+      <h2>Perímetro</h2>
+      <div class="quadro">
+        <img id="snapshot" alt="Imagem de referência da câmera" />
+        <canvas id="perimetro-canvas"></canvas>
+      </div>
+      <p class="legenda">
+        Clique para adicionar vértices &middot; arraste um vértice para movê-lo &middot;
+        botão direito sobre um vértice para removê-lo.
+      </p>
+      <div class="botoes">
+        <button id="desfazer">Desfazer</button>
+        <button id="limpar">Limpar</button>
+        <button id="perimetro-total">Imagem inteira</button>
+        <button id="nova-imagem">Atualizar imagem</button>
+        <button id="salvar-perimetro" class="primario">Salvar perímetro</button>
+      </div>
+      <p id="perimetro-msg" class="msg"></p>
+    </section>
+  </main>
+
+  <section id="eventos-section">
+    <h2>Histórico de eventos</h2>
+    <ul id="lista-eventos"></ul>
+  </section>
+
+  <!-- Sem internet (ex.: Pi isolado) o Socket.IO não carrega; events.js
+       cai para consulta periódica de /api/eventos. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="perimeter.js"></script>
+  <script src="events.js"></script>
+</body>
+</html>

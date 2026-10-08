@@ -1,2 +1,20 @@
+# Configuração local (já existia no repositório)
 CLAUDE.md
 .env
+
+# Ambiente virtual e cache do Python
+.venv/
+__pycache__/
+*.pyc
+
+# Modelo de detecção: baixado pelo script de instalação (~22 MB)
+server/models/*
+!server/models/.gitkeep
+
+# Gerados durante a execução
+server/data/perimeter.json
+server/events/*
+!server/events/.gitkeep
+*.jpg
+*.png
+!docs/**/*.png

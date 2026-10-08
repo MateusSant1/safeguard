@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Scripts de shell precisam de fim de linha LF, senão o bash do
+# Raspberry Pi falha com "/bin/bash^M: bad interpreter".
+*.sh text eol=lf

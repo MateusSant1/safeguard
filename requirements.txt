@@ -1,0 +1,18 @@
+# Dependências do COMPUTADOR DE DESENVOLVIMENTO (Windows/Linux/macOS).
+# No Raspberry Pi use requirements-pi.txt (o OpenCV e o NumPy vêm do apt).
+#
+#   pip install -r requirements.txt
+
+# Servidor web e notificações
+flask>=3.0,<4
+flask-socketio>=5.3,<6
+python-dotenv>=1.0
+requests>=2.31
+
+# Visão computacional
+# O OpenCV 5.0 removeu o suporte a modelos Caffe (cv2.dnn.readNetFromCaffe),
+# que é o formato do MobileNet-SSD usado em object_detector.py. Por isso a
+# versão fica abaixo de 5. Usamos opencv-python (com janela), porque os
+# scripts de teste mostram o vídeo com cv2.imshow.
+opencv-python>=4.9,<5
+numpy>=1.26

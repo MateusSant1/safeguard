@@ -1,0 +1,121 @@
+/* Painel interno, sem firulas. Prioridade: o canvas do perímetro ficar
+   exatamente alinhado com a imagem por baixo dele (ver .quadro). */
+
+:root {
+  --fundo: #f4f5f7;
+  --cartao: #ffffff;
+  --texto: #1d2129;
+  --suave: #5f6673;
+  --borda: #d9dce1;
+  --primario: #1f6feb;
+  --perigo: #d1242f;
+  --ok: #1a7f37;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 1rem 1.25rem 2rem;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+
+.pill {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--borda);
+  font-size: 0.85rem;
+}
+.pill.ok { background: #dafbe1; color: var(--ok); }
+.pill.erro { background: #ffebe9; color: var(--perigo); }
+
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
+  gap: 1rem;
+}
+
+section {
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 1rem;
+}
+#eventos-section { margin-top: 1rem; }
+
+/* A imagem define o tamanho; o canvas cobre exatamente a mesma área. */
+.quadro {
+  position: relative;
+  line-height: 0;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.quadro img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+#perimetro-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.legenda { color: var(--suave); font-size: 0.85rem; margin: 0.5rem 0; }
+
+.botoes { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: var(--cartao);
+  cursor: pointer;
+}
+button:hover { border-color: var(--suave); }
+button.primario { background: var(--primario); border-color: var(--primario); color: #fff; }
+
+.msg { min-height: 1.2em; font-size: 0.9rem; margin: 0.5rem 0 0; }
+.msg.ok { color: var(--ok); }
+.msg.erro { color: var(--perigo); }
+.msg.pendente { color: #9a6700; }
+
+.alerta {
+  background: var(--perigo);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+#lista-eventos { list-style: none; margin: 0; padding: 0; }
+#lista-eventos li {
+  border-top: 1px solid var(--borda);
+  padding: 0.75rem 0;
+}
+#lista-eventos li:first-child { border-top: none; }
+.evento-hora { font-weight: 600; margin-bottom: 0.5rem; }
+.miniaturas { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.miniaturas img {
+  width: 140px;
+  max-width: 100%;
+  border-radius: 4px;
+  border: 1px solid var(--borda);
+}
+.vazio { color: var(--suave); }
