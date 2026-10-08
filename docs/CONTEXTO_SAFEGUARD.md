@@ -174,11 +174,11 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 
 - **Problema 1 — decisão do perímetro.** Nos testes, com a pessoa perto da webcam, as pernas nem aparecem na imagem: a caixa pega só o tronco e o `foot_point` não representa a posição da pessoa. Adotada a correção (a): a pessoa está dentro quando pelo menos 15% da caixa cai dentro do polígono (`DECISION_MODE=overlap`, `MIN_OVERLAP_RATIO=0.15`). Os modos `foot` e `center` continuam disponíveis pelo `.env`. Atenção ao testar: se a pessoa cruzar a linha do perímetro, a caixa sempre terá overlap suficiente.
 - **Problema 2 — `event_recorder`.** O gravador não tinha defeito; ele não era acionado por causa do problema 1.
+- **Animais.** Testado com um animal real na cena: aparece em cinza "ignorado" e não dispara evento.
 
 ### Pendentes
 
 - **Calibração de longe.** O limiar 0.15 foi validado com a pessoa perto da webcam; falta testar com a pessoa distante, de corpo inteiro.
-- **Animais.** O vídeo mostra animais como caixas cinza "ignorado" e eles nunca disparam evento, mas ainda não houve teste com um animal real.
 - **Desempenho no Pi 3.** Ainda não medido.
 
 ### Limitações conhecidas (aceitas)
@@ -213,8 +213,8 @@ Se algum destes erros aparecer de novo, a causa e a solução já são conhecida
 
 | # | Tarefa |
 |---|---|
-| 1 | Testar a calibração do overlap com a pessoa distante e, se possível, com um animal |
-| 2 | Instalar no Pi com `scripts/setup_raspberry_pi.sh` e rodar `python -m server.app` lá, medindo o desempenho |
+| 1 | Instalar no Pi com `scripts/setup_raspberry_pi.sh` e rodar `python -m server.app` lá, medindo o desempenho |
+| 2 | Testar a calibração do overlap com a pessoa distante |
 | 3 | Mesclar a branch `pipeline-raspberry` na `main` (pull request no GitHub) |
 | 4 | Teste completo no Pi; prints e vídeo para o relatório (seções 9 e 13) |
 

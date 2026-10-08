@@ -86,16 +86,16 @@ Sobre a versão do OpenCV: o OpenCV 5.0 removeu o suporte a modelos Caffe, que �
 | `app.py` | Funcional | Webcam real, pelo navegador |
 | `notifier.py` | Funcional | Bot real (`test_telegram.py`) |
 | `client/` | Funcional: vídeo ao vivo, editor do perímetro, histórico e alerta em tempo real | Navegador no PC de desenvolvimento |
+| Animais ignorados | Funcional: aparecem em cinza "ignorado" e não disparam evento | Webcam real, com animal na cena |
+| Raspberry Pi 3 | **Ainda não testado** | — |
 
 ### Problemas conhecidos
 
 **1. Calibração só de perto.** O limiar de overlap (0.15) foi validado com a pessoa perto da webcam, ocupando boa parte da imagem. Falta testar com a pessoa mais distante, de corpo inteiro, que é a situação real de vigilância. O vídeo ao vivo mostra o `overlap` de cada pessoa para ajudar nessa calibração (`MIN_OVERLAP_RATIO` no `.env`).
 
-**2. Animais ainda não testados.** O vídeo mostra animais detectados como caixas cinza "ignorado", e eles nunca disparam evento, mas isso ainda não foi verificado com um animal de verdade na cena.
+**2. IPv6 quebrado no PC de desenvolvimento.** O `requests` tentava o IPv6 do `api.telegram.org` primeiro e terminava em `ReadTimeout`. O `notifier.py` agora usa só IPv4 (`TELEGRAM_FORCE_IPV4=1`, o padrão).
 
-**3. IPv6 quebrado no PC de desenvolvimento.** O `requests` tentava o IPv6 do `api.telegram.org` primeiro e terminava em `ReadTimeout`. O `notifier.py` agora usa só IPv4 (`TELEGRAM_FORCE_IPV4=1`, o padrão).
-
-**4. Limitações do modelo.** O MobileNet-SSD é de 2017 e foi treinado em um conjunto de dados pequeno. Ele perde a detecção em movimentos bruscos (por causa do desfoque) e depende bastante de a pessoa estar de frente e bem enquadrada. O detector também não faz rastreamento: cada frame é analisado do zero. Isso é aceitável para o escopo do projeto, e a troca por um modelo mais moderno (YOLO exportado para ONNX) fica registrada como possível melhoria.
+**3. Limitações do modelo.** O MobileNet-SSD é de 2017 e foi treinado em um conjunto de dados pequeno. Ele perde a detecção em movimentos bruscos (por causa do desfoque) e depende bastante de a pessoa estar de frente e bem enquadrada. O detector também não faz rastreamento: cada frame é analisado do zero. Isso é aceitável para o escopo do projeto, e a troca por um modelo mais moderno (YOLO exportado para ONNX) fica registrada como possível melhoria.
 
 ---
 
@@ -253,7 +253,6 @@ Os parâmetros ajustáveis do pipeline ficam todos no `config.py`, com valor pad
 
 | Ordem | Tarefa |
 |---|---|
-| 1 | Testar a calibração com a pessoa distante, de corpo inteiro (problema 1) |
-| 2 | Testar com um animal real na cena (problema 2) |
-| 3 | Instalar e testar no Raspberry Pi 3 com `scripts/setup_raspberry_pi.sh` (ver `docs/INSTALACAO_RASPBERRY_PI.md`), medindo o desempenho do loop |
-| 4 | Mesclar a branch `pipeline-raspberry` na `main` |
+| 1 | Instalar e testar no Raspberry Pi 3 com `scripts/setup_raspberry_pi.sh` (ver `docs/INSTALACAO_RASPBERRY_PI.md`), medindo o desempenho do loop |
+| 2 | Testar a calibração com a pessoa distante, de corpo inteiro (problema 1) |
+| 3 | Mesclar a branch `pipeline-raspberry` na `main` |
