@@ -41,6 +41,11 @@ class MotionDetector:
         # Kernel usado para limpar ruído da máscara de movimento antes de
         # procurar contornos (remove pontinhos isolados de 1-2 pixels).
         self._clean_kernel = np.ones((3, 3), np.uint8)
+        # Resultado da última chamada a detect(), para diagnóstico (o
+        # pipeline desenha isso no vídeo): máscara de movimento já limpa e
+        # restrita ao perímetro, e a área da maior região encontrada.
+        self.last_mask: np.ndarray | None = None
+        self.last_area: float = 0.0
 
     def warm_up(self, frames) -> None:
         """
@@ -70,4 +75,10 @@ class MotionDetector:
         contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         maior_area = max((cv2.contourArea(c) for c in contours), default=0)
 
+        self.last_mask = fg_mask
+        self.last_area = float(maior_area)
         return maior_area >= self._threshold_area
+
+    @property
+    def threshold_area(self) -> int:
+        return self._threshold_area

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from server.config import EVENTS_DIR, FRAMES_PER_EVENT
 
@@ -23,7 +24,7 @@ class EventRecorder:
         self._frames_per_event = frames_per_event
         self._interval_seconds = interval_seconds
 
-    def capture_event(self, camera) -> list[Path]:
+    def capture_event(self, camera, first_frame: np.ndarray | None = None) -> list[Path]:
         """
         Captura frames_per_event frames em sequência e salva em
         EVENTS_DIR/<timestamp>/frame_00.jpg, frame_01.jpg, ...
@@ -31,6 +32,10 @@ class EventRecorder:
         Recebe o objeto `camera` (já aberto) em vez de abrir uma câmera
         própria -- assim usa o mesmo frame stream que o resto do
         pipeline, sem disputar o dispositivo com outra captura.
+
+        first_frame: o frame em que a invasão foi detectada. Se vier, é
+        salvo como frame_00 (garante que a pessoa aparece no evento) e só
+        os demais são lidos da câmera.
 
         Retorna a lista de caminhos das imagens salvas (pode vir mais
         curta que frames_per_event se algum frame falhar na leitura).
@@ -41,14 +46,16 @@ class EventRecorder:
 
         caminhos: list[Path] = []
         for i in range(self._frames_per_event):
-            frame = camera.read_frame()
+            if i == 0 and first_frame is not None:
+                frame = first_frame
+            else:
+                if i > 0:
+                    time.sleep(self._interval_seconds)
+                frame = camera.read_frame()
+
             if frame is not None:
                 caminho = event_dir / f"frame_{i:02d}.jpg"
                 cv2.imwrite(str(caminho), frame)
                 caminhos.append(caminho)
-
-            is_last = i == self._frames_per_event - 1
-            if not is_last:
-                time.sleep(self._interval_seconds)
 
         return caminhos

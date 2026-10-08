@@ -17,23 +17,37 @@ import time
 from datetime import datetime
 from typing import Callable
 
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 
 from server.config import (
+    ANIMAL_CLASSES,
     CONFIDENCE_THRESHOLD,
+    DECISION_MODE,
     JPEG_QUALITY,
     MOTION_THRESHOLD_AREA,
     NOTIFICATION_COOLDOWN_SECONDS,
+    TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID,
     WARM_UP_FRAMES,
 )
 from server.notifier import send_alert
 from server.perimeter import (
+    box_overlap_ratio,
     build_mask,
     denormalize,
     load_perimeter,
     person_in_perimeter,
 )
+
+if TYPE_CHECKING:
+    from server.camera import Camera
+    from server.event_recorder import EventRecorder
+    from server.motion_detector import MotionDetector
+    from server.object_detector import ObjectDetector
 
 logger = logging.getLogger(__name__)
 
@@ -41,19 +55,31 @@ MAX_READ_FAILURES = 50  # leituras seguidas sem frame (~5 s) antes de desistir
 COLOR_PERIMETER = (255, 200, 0)
 COLOR_INSIDE = (0, 0, 255)
 COLOR_OUTSIDE = (0, 200, 0)
+COLOR_MOTION = (0, 255, 255)
+COLOR_IGNORED = (160, 160, 160)
+
+
+def _put_text(
+    img: np.ndarray, text: str, org: tuple[int, int], color: tuple[int, int, int], scale: float
+) -> None:
+    """Texto com contorno preto, legível sobre qualquer fundo."""
+    if not text:
+        return
+    cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 4, cv2.LINE_AA)
+    cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, 1, cv2.LINE_AA)
 
 
 class Pipeline:
     def __init__(
         self,
-        camera=None,
-        motion_detector=None,
-        object_detector=None,
-        event_recorder=None,
-        notify: Callable = send_alert,
+        camera: "Camera | None" = None,
+        motion_detector: "MotionDetector | None" = None,
+        object_detector: "ObjectDetector | None" = None,
+        event_recorder: "EventRecorder | None" = None,
+        notify: Callable[[list[Path], str], None] | None = send_alert,
         on_event: Callable[[dict], None] | None = None,
         cooldown_seconds: float = NOTIFICATION_COOLDOWN_SECONDS,
-    ):
+    ) -> None:
         self._camera = camera
         self._motion = motion_detector
         self._objects = object_detector
@@ -107,6 +133,15 @@ class Pipeline:
         if self._recorder is None:
             from server.event_recorder import EventRecorder
             self._recorder = EventRecorder()
+
+        # Sem bot configurado, roda só local: avisa uma vez em vez de gerar
+        # um traceback a cada evento.
+        if self._notify is send_alert and not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
+            logger.warning(
+                "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID vazios no .env: "
+                "eventos serão salvos, mas não enviados ao Telegram."
+            )
+            self._notify = None
 
         self._camera.start()
         try:
@@ -233,29 +268,38 @@ class Pipeline:
         movimento = self._motion.detect(frame, self._mask)
 
         pessoas: list[dict] = []
+        animais: list[dict] = []
         if movimento:
             # Estágio 2 (caro): só roda quando o estágio 1 acusou movimento.
-            pessoas = self._objects.detect_people(frame)
+            # Animais também são pedidos, mas só para aparecerem no vídeo
+            # como "ignorados" -- nunca disparam evento.
+            deteccoes = self._objects.detect(frame, {"person"} | ANIMAL_CLASSES)
+            pessoas = [d for d in deteccoes if d["label"] == "person"]
+            animais = [d for d in deteccoes if d["label"] != "person"]
             for p in pessoas:
                 p["inside"] = person_in_perimeter(p["box"], p["foot_point"], self._polygon_px)
+                # Só para exibir no vídeo (calibrar MIN_OVERLAP_RATIO).
+                p["overlap"] = box_overlap_ratio(p["box"], self._polygon_px)
 
         invasao = any(p["inside"] for p in pessoas)
         agora = time.time()
         em_cooldown = (agora - self._last_event_ts) < self._cooldown
 
-        self._publish(frame, self._annotate(frame, movimento, pessoas, em_cooldown, agora))
+        self._publish(
+            frame, self._annotate(frame, movimento, pessoas, animais, em_cooldown, agora)
+        )
 
         if invasao and not em_cooldown:
-            self._handle_intrusion(len(pessoas), agora)
+            self._handle_intrusion(frame, len(pessoas), agora)
 
-    def _handle_intrusion(self, num_pessoas: int, agora: float) -> None:
+    def _handle_intrusion(self, frame: np.ndarray, num_pessoas: int, agora: float) -> None:
         # O cooldown começa antes da captura: se ela falhar, não tentamos
         # de novo a cada frame.
         self._last_event_ts = agora
         logger.info("INVASÃO detectada (%d pessoa(s) no frame) -- capturando evento.", num_pessoas)
 
         try:
-            caminhos = self._recorder.capture_event(self._camera)
+            caminhos = self._recorder.capture_event(self._camera, first_frame=frame)
         except Exception:
             logger.exception("Falha ao capturar o evento.")
             return
@@ -269,9 +313,10 @@ class Pipeline:
         logger.info("%d imagem(ns) salvas em %s.", len(caminhos), caminhos[0].parent)
 
         # Rede lenta não pode travar a leitura da câmera: envia em outra thread.
-        threading.Thread(
-            target=self._notify_safe, args=(caminhos, legenda), name="notify", daemon=True
-        ).start()
+        if self._notify is not None:
+            threading.Thread(
+                target=self._notify_safe, args=(caminhos, legenda), name="notify", daemon=True
+            ).start()
 
         if self._on_event is not None:
             try:
@@ -283,7 +328,7 @@ class Pipeline:
             except Exception:
                 logger.exception("Falha ao avisar os clientes do evento.")
 
-    def _notify_safe(self, caminhos, legenda: str) -> None:
+    def _notify_safe(self, caminhos: list[Path], legenda: str) -> None:
         try:
             self._notify(caminhos, legenda)
         except Exception:
@@ -292,19 +337,64 @@ class Pipeline:
     # ------------------------------------------------------------------
     # Desenho e publicação
     # ------------------------------------------------------------------
-    def _annotate(self, frame, movimento, pessoas, em_cooldown, agora) -> np.ndarray:
+    def _annotate(
+        self,
+        frame: np.ndarray,
+        movimento: bool,
+        pessoas: list[dict],
+        animais: list[dict],
+        em_cooldown: bool,
+        agora: float,
+    ) -> np.ndarray:
         img = frame.copy()
+
+        # Pinta de amarelo os pixels que o MOG2 considerou movimento (já
+        # restritos ao perímetro) -- mostra o que realmente aciona o estágio 2.
+        mask = getattr(self._motion, "last_mask", None)
+        if mask is not None and mask.shape[:2] == img.shape[:2]:
+            overlay = img.copy()
+            overlay[mask > 0] = COLOR_MOTION
+            cv2.addWeighted(overlay, 0.4, img, 0.6, 0, dst=img)
+
         cv2.polylines(img, [self._polygon_px], isClosed=True, color=COLOR_PERIMETER, thickness=2)
+
+        for a in animais:
+            x1, y1, x2, y2 = a["box"]
+            cv2.rectangle(img, (x1, y1), (x2, y2), COLOR_IGNORED, 2)
+            _put_text(img, f"{a['label']} {a['confidence']:.2f} (ignorado)",
+                      (x1, max(y1 - 8, 15)), COLOR_IGNORED, 0.5)
+
         for p in pessoas:
             x1, y1, x2, y2 = p["box"]
             cor = COLOR_INSIDE if p["inside"] else COLOR_OUTSIDE
             cv2.rectangle(img, (x1, y1), (x2, y2), cor, 2)
-            cv2.circle(img, p["foot_point"], 6, cor, -1)
-        status = "MOVIMENTO" if movimento else "sem movimento"
+            # Marca o ponto que o modo de decisão atual realmente testa.
+            if DECISION_MODE == "foot":
+                cv2.circle(img, p["foot_point"], 6, cor, -1)
+            elif DECISION_MODE == "center":
+                cv2.circle(img, ((x1 + x2) // 2, (y1 + y2) // 2), 6, cor, -1)
+            texto = f"person {p['confidence']:.2f} overlap={p['overlap']:.2f}"
+            _put_text(img, texto, (x1, max(y1 - 8, 15)), cor, 0.5)
+
+        # Linha 1: estágio 1 (movimento). Linha 2: estágio 2 + decisão.
+        # (Fonte Hershey não tem acentos -- textos em ASCII.)
+        area = getattr(self._motion, "last_area", 0.0)
+        minimo = getattr(self._motion, "threshold_area", 0)
+        linha1 = f"[{DECISION_MODE}] " + ("MOVIMENTO" if movimento else "sem movimento")
+        linha1 += f"  area={area:.0f}px (min {minimo})"
+        if any(p["inside"] for p in pessoas):
+            linha2 = "PESSOA DENTRO DO PERIMETRO"
+        elif pessoas:
+            linha2 = "pessoa fora do perimetro"
+        elif movimento:
+            linha2 = "movimento sem pessoa"
+        else:
+            linha2 = ""
         if em_cooldown:
             restante = self._cooldown - (agora - self._last_event_ts)
-            status += f"  (cooldown: {restante:.0f}s)"
-        cv2.putText(img, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            linha2 += f"  (cooldown: {restante:.0f}s)"
+        _put_text(img, linha1, (10, 25), (255, 255, 255), 0.6)
+        _put_text(img, linha2.strip(), (10, 50), (255, 255, 255), 0.6)
         return img
 
     def _publish(self, raw: np.ndarray, annotated: np.ndarray) -> None:

@@ -26,12 +26,21 @@ class ObjectDetector:
         """
         Roda a rede sobre o frame e retorna uma lista de detecções da
         classe "person", cada uma como:
-            {"box": (x1, y1, x2, y2), "confidence": float, "foot_point": (x, y)}
+            {"label": "person", "box": (x1, y1, x2, y2), "confidence": float,
+             "foot_point": (x, y)}
 
         Detecções de qualquer outra classe (incluindo animais) são
         descartadas aqui mesmo e nunca chegam a virar um resultado -- é
         assim que o sistema "sabe" ignorar bichos: o chamador só vê
         pessoas, nunca precisa filtrar nada de novo.
+        """
+        return self.detect(frame, {"person"})
+
+    def detect(self, frame: np.ndarray, classes: set[str]) -> list[dict]:
+        """
+        Igual a detect_people, mas para qualquer conjunto de classes do VOC
+        (ex.: {"person"} | ANIMAL_CLASSES). Usado pelo pipeline para também
+        desenhar os animais que foram ignorados -- uma única passada da rede.
         """
         frame_height, frame_width = frame.shape[:2]
 
@@ -41,7 +50,7 @@ class ObjectDetector:
         self._net.setInput(blob)
         raw_detections = self._net.forward()
 
-        pessoas = []
+        deteccoes = []
         # raw_detections tem shape (1, 1, N, 7); cada linha é:
         #   [batch_id, class_id, confidence, x1, y1, x2, y2]
         # com x/y normalizados entre 0.0 e 1.0 (fração do frame de entrada).
@@ -55,7 +64,8 @@ class ObjectDetector:
             if class_id < 0 or class_id >= len(VOC_CLASSES):
                 continue
 
-            if VOC_CLASSES[class_id] != "person":
+            label = VOC_CLASSES[class_id]
+            if label not in classes:
                 continue
 
             x1 = int(raw_detections[0, 0, i, 3] * frame_width)
@@ -74,10 +84,11 @@ class ObjectDetector:
             # pessoa está pisando na cena.
             foot_point = ((x1 + x2) // 2, y2)
 
-            pessoas.append({
+            deteccoes.append({
+                "label": label,
                 "box": (x1, y1, x2, y2),
                 "confidence": confidence,
                 "foot_point": foot_point,
             })
 
-        return pessoas
+        return deteccoes
