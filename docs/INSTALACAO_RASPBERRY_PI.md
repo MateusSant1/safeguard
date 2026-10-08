@@ -18,13 +18,11 @@ O ambiente virtual (`.venv`) é criado com `--system-site-packages` para enxerga
 
 ## 0. Onde está o código
 
-O código está na branch **`pipeline-raspberry`** do repositório. A `main` ainda tem só os arquivos vazios dos primeiros commits, então, até a branch ser mesclada, clone sempre com `-b pipeline-raspberry`:
+O código está na branch **`main`** do repositório:
 
 ```bash
-git clone -b pipeline-raspberry https://github.com/MateusSant1/safeguard.git
+git clone https://github.com/MateusSant1/safeguard.git
 ```
-
-Para trazer o código para a `main`, abra um pull request da branch `pipeline-raspberry` para a `main` no GitHub e faça o merge. Depois disso, o `-b pipeline-raspberry` deixa de ser necessário.
 
 O `.gitignore` impede o envio da `.venv`, do modelo (~22 MB), das imagens de teste e do `.env`. Ele também ignora o `CLAUDE.md`, como o grupo tinha decidido; se quiserem que todos recebam esse arquivo pelo Git, apaguem essa linha do `.gitignore`.
 
@@ -67,7 +65,7 @@ Se `vcgencmd get_throttled` mostrar algo diferente de `0x0`, a fonte é fraca ou
 
 ```bash
 cd ~
-git clone -b pipeline-raspberry https://github.com/MateusSant1/safeguard.git
+git clone https://github.com/MateusSant1/safeguard.git
 cd safeguard
 bash scripts/setup_raspberry_pi.sh
 ```
@@ -125,7 +123,7 @@ A saída esperada é algo como `4.10.0 True`.
 
 ```bash
 cd ~
-git clone -b pipeline-raspberry https://github.com/MateusSant1/safeguard.git
+git clone https://github.com/MateusSant1/safeguard.git
 cd safeguard
 ```
 
@@ -208,7 +206,15 @@ Para ver as imagens geradas, copie-as para o Windows. No **PowerShell do Windows
 scp usuario@raspberrypi.local:~/safeguard/test_perimetro.jpg .
 ```
 
-Os scripts `test_motion`, `test_object` e `test_pipeline` abrem uma janela com o vídeo (`cv2.imshow`). Pelo SSH não há tela para essa janela, e eles falham com um erro do tipo "cannot connect to X server" ou "could not connect to display". Esses três só rodam com monitor e teclado ligados ao Pi, usando o terminal da área de trabalho do Raspberry Pi OS. No Raspberry Pi OS Lite, que não tem área de trabalho, eles não rodam; o teste remoto do pipeline vai ser feito pela interface web, quando o `app.py` estiver pronto.
+Os scripts `test_motion`, `test_object` e `test_pipeline` abrem uma janela com o vídeo (`cv2.imshow`). Pelo SSH não há tela para essa janela, e eles falham com um erro do tipo "cannot connect to X server" ou "could not connect to display". Esses três só rodam com monitor e teclado ligados ao Pi. Pelo SSH, teste o sistema completo pela interface web:
+
+```bash
+python -m server.test_telegram         # configura e testa o Telegram (sem câmera)
+python -m server.app                   # inicia o sistema
+hostname -I                            # IP do Pi
+```
+
+e abra `http://<IP do Pi>:5000` no navegador do computador ou do celular. O passo a passo de uso (perímetro, Telegram, início automático com o systemd) está no [README](../README.md).
 
 Para ter uma ideia da velocidade: no Pi 3, o MobileNet-SSD processa cerca de 1 imagem por segundo. Isso é esperado e suficiente, porque a detecção de pessoas só roda quando há movimento.
 

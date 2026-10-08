@@ -1,6 +1,6 @@
 # Safeguard — Contexto completo do projeto
 
-Exportado em 07/10/2026; seções 4 e 6 a 10 atualizadas em 08/10/2026. Este arquivo resume a conversa em que o projeto foi planejado e desenvolvido, de 02/09 a 08/10/2026: o que foi decidido, o que já funciona, o que não funciona, o que já deu errado e como foi resolvido. Serve para qualquer pessoa do grupo continuar o trabalho em outro chat sem precisar reconstruir esse histórico. O Apêndice A é um retrato do código em 07/10; o código atual está no repositório (branch `pipeline-raspberry`).
+Exportado em 07/10/2026; seções 4 e 6 a 10 atualizadas em 08/10/2026. Este arquivo resume a conversa em que o projeto foi planejado e desenvolvido, de 02/09 a 08/10/2026: o que foi decidido, o que já funciona, o que não funciona, o que já deu errado e como foi resolvido. Serve para qualquer pessoa do grupo continuar o trabalho em outro chat sem precisar reconstruir esse histórico. O Apêndice A é um retrato do código em 07/10; o código atual está no repositório (branch `main`).
 
 ## Como usar este arquivo
 
@@ -158,7 +158,7 @@ Os pontos são frações (0.0 a 1.0) da largura e da altura da imagem, para que 
 | `notifier.py` | Funcional | Bot real (`python -m server.test_telegram`) |
 | `client/` | Funcional: vídeo ao vivo, editor do perímetro, histórico, alerta em tempo real | Navegador no PC de desenvolvimento |
 
-**Repositório no GitHub:** até 07/10/2026 a `main` tinha 7 commits com todos os arquivos de `server/` e `client/` **vazios (0 bytes)**, inclusive um `server/data/perimeter.json` vazio. Em 07/10 todo o código desta conversa foi enviado para a branch **`pipeline-raspberry`**. A `main` continua vazia até a branch ser mesclada; até lá, clone com `git clone -b pipeline-raspberry ...`.
+**Repositório no GitHub:** até 07/10/2026 a `main` tinha 7 commits com todos os arquivos de `server/` e `client/` **vazios (0 bytes)**, inclusive um `server/data/perimeter.json` vazio. Em 07/10 todo o código desta conversa foi enviado para a branch **`pipeline-raspberry`**. Em 08/10 a branch foi mesclada na `main` (PR #1); clone com `git clone https://github.com/MateusSant1/safeguard.git`.
 
 **Ambiente Windows (máquina do Mateus):** `.venv` com OpenCV 4.x (reinstalado abaixo da versão 5), modelo baixado em `server/models/`, webcam no índice 0 (640x480) e um perímetro de teste salvo.
 
@@ -215,8 +215,7 @@ Se algum destes erros aparecer de novo, a causa e a solução já são conhecida
 |---|---|
 | 1 | Instalar no Pi com `scripts/setup_raspberry_pi.sh` e rodar `python -m server.app` lá, medindo o desempenho |
 | 2 | Testar a calibração do overlap com a pessoa distante |
-| 3 | Mesclar a branch `pipeline-raspberry` na `main` (pull request no GitHub) |
-| 4 | Teste completo no Pi; prints e vídeo para o relatório (seções 9 e 13) |
+| 3 | Teste completo no Pi; prints e vídeo para o relatório (seções 9 e 13) |
 
 ---
 
@@ -271,7 +270,7 @@ Perímetro de teste, sem BOM:
 Ver `INSTALACAO_RASPBERRY_PI.md`. Em resumo:
 
 ```bash
-git clone -b pipeline-raspberry https://github.com/MateusSant1/safeguard.git
+git clone https://github.com/MateusSant1/safeguard.git
 cd safeguard
 bash scripts/setup_raspberry_pi.sh
 ```
@@ -280,7 +279,7 @@ bash scripts/setup_raspberry_pi.sh
 
 ## Apêndice A — Código em 07/10/2026
 
-> **Desatualizado:** este apêndice é o retrato de 07/10, antes do `pipeline.py`, do `app.py`, do `notifier.py` e do cliente serem implementados. O código atual está no repositório (branch `pipeline-raspberry`); consulte-o lá.
+> **Desatualizado:** este apêndice é o retrato de 07/10, antes do `pipeline.py`, do `app.py`, do `notifier.py` e do cliente serem implementados. O código atual está no repositório (branch `main`); consulte-o lá.
 
 Versão de cada arquivo em 07/10, igual à do `safeguard_repositorio.zip`. Ela inclui as duas correções feitas no computador do Mateus: leitura com `utf-8-sig` no `perimeter.py` e limiar 0.26 nos testes. Se a cópia local de alguém tiver mudanças posteriores, a cópia local vale.
 

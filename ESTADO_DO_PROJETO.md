@@ -152,7 +152,7 @@ safeguard/
 
 Nenhum módulo além de `camera.py` deve abrir a câmera diretamente, para que trocar a webcam pela câmera do Raspberry Pi exija mudança em um arquivo só.
 
-Até 07/10/2026, todos os arquivos de código da `main` no GitHub estavam **vazios (0 bytes)**, inclusive um `server/data/perimeter.json` vazio, que é o que gerava o aviso "Arquivo de perímetro inválido". Em 07/10 o código foi enviado para a branch **`pipeline-raspberry`**. Até ela ser mesclada na `main`, clone com `git clone -b pipeline-raspberry https://github.com/MateusSant1/safeguard.git`.
+Até 07/10/2026, todos os arquivos de código da `main` no GitHub estavam **vazios (0 bytes)**, inclusive um `server/data/perimeter.json` vazio, que é o que gerava o aviso "Arquivo de perímetro inválido". Em 07/10 o código foi enviado para a branch `pipeline-raspberry`, mesclada na **`main`** em 08/10 (PR #1). Clone com `git clone https://github.com/MateusSant1/safeguard.git`.
 
 ---
 
@@ -255,4 +255,3 @@ Os parâmetros ajustáveis do pipeline ficam todos no `config.py`, com valor pad
 |---|---|
 | 1 | Instalar e testar no Raspberry Pi 3 com `scripts/setup_raspberry_pi.sh` (ver `docs/INSTALACAO_RASPBERRY_PI.md`), medindo o desempenho do loop |
 | 2 | Testar a calibração com a pessoa distante, de corpo inteiro (problema 1) |
-| 3 | Mesclar a branch `pipeline-raspberry` na `main` |

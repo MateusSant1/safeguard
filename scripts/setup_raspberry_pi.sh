@@ -10,7 +10,7 @@
 #
 # Variáveis opcionais:
 #   REPO_URL      repositório a clonar (padrão: MateusSant1/safeguard)
-#   BRANCH        branch a clonar (padrão: pipeline-raspberry; troque para main depois do merge)
+#   BRANCH        branch a clonar (padrão: main)
 #   PROJECT_DIR   pasta do projeto (padrão: a raiz do repositório onde este
 #                 script está, ou ~/safeguard)
 #   SKIP_UPGRADE  =1 para pular o "apt full-upgrade" (mais rápido)
@@ -30,7 +30,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/MateusSant1/safeguard.git}"
-BRANCH="${BRANCH:-pipeline-raspberry}"
+BRANCH="${BRANCH:-main}"
 MODEL_BASE="https://github.com/PINTO0309/MobileNet-SSD-RealSense/raw/refs/heads/master/caffemodel/MobileNetSSD"
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -93,7 +93,7 @@ fi
 cd "$PROJECT_DIR"
 
 if [ ! -s server/camera.py ] || [ ! -s server/object_detector.py ]; then
-    fail "Os arquivos de server/ estão vazios ou faltando. Você provavelmente está na branch main, que ainda não tem o código. Use a branch pipeline-raspberry: git checkout pipeline-raspberry (ou clone com git clone -b pipeline-raspberry ...) e rode este script de novo."
+    fail "Os arquivos de server/ estão vazios ou faltando. Atualize o código (git checkout main && git pull) e rode este script de novo."
 fi
 
 # ---------------------------------------------------------------------------
@@ -192,9 +192,9 @@ Instalação concluída.
 Próximos passos (a partir de $PROJECT_DIR):
   source .venv/bin/activate
   python server/list_cameras.py          # descobre o índice da webcam
-  python -m server.test_integration      # gera test_perimetro.jpg
-Os testes com janela (test_motion, test_object, test_pipeline) precisam de
-monitor ligado ao Pi; pelo SSH eles não abrem a janela.
+  python -m server.test_telegram         # configura e testa o Telegram
+  python -m server.app                   # inicia; abra http://<IP do Pi>:5000
+O IP do Pi aparece com: hostname -I
 EOF
 if [ "$PRECISA_RELOGAR" = "1" ]; then
     echo "Lembre-se: saia e entre de novo no SSH antes de usar a câmera."
