@@ -29,13 +29,36 @@ VOC_CLASSES = [
 ]
 ANIMAL_CLASSES = {"bird", "cat", "cow", "dog", "horse", "sheep"}
 
+# --- Detecção (limiares calibrados com a webcam; ajustáveis pelo .env) ---
+# Área mínima (px) de uma região em movimento para acionar o estágio 2.
+MOTION_THRESHOLD_AREA = int(os.getenv("MOTION_THRESHOLD_AREA", "500"))
+# Confiança mínima para aceitar uma detecção de "person" (0.5 perdia muita gente).
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.26"))
+# Frames para o MOG2 aprender o fundo antes de agir sobre o movimento.
+WARM_UP_FRAMES = int(os.getenv("WARM_UP_FRAMES", "30"))
+
 # --- Perímetro ---
 PERIMETER_FILE = BASE_DIR / "data" / "perimeter.json"
+
+# Como decidir se a pessoa está "dentro" do perímetro:
+#   "foot"    -> meio da base da caixa (comportamento original; falha quando a
+#                caixa pega só o tronco)
+#   "center"  -> centro da caixa
+#   "overlap" -> fração da caixa que cai dentro do polígono >= MIN_OVERLAP_RATIO
+DECISION_MODE = os.getenv("DECISION_MODE", "overlap")
+MIN_OVERLAP_RATIO = float(os.getenv("MIN_OVERLAP_RATIO", "0.15"))
 
 # --- Eventos (capturas de invasão) ---
 EVENTS_DIR = BASE_DIR / "events"
 FRAMES_PER_EVENT = 5
 NOTIFICATION_COOLDOWN_SECONDS = 60
+
+# --- Servidor web ---
+SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("SERVER_PORT", "5000"))
+CLIENT_DIR = BASE_DIR.parent / "client"
+JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "80"))
+EVENTS_LIST_LIMIT = 50
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

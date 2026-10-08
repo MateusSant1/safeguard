@@ -29,15 +29,16 @@ import time
 import cv2
 
 from server.camera import Camera
-from server.config import NOTIFICATION_COOLDOWN_SECONDS
+from server.config import (
+    CONFIDENCE_THRESHOLD,
+    MOTION_THRESHOLD_AREA,
+    NOTIFICATION_COOLDOWN_SECONDS,
+    WARM_UP_FRAMES,
+)
 from server.event_recorder import EventRecorder
 from server.motion_detector import MotionDetector
 from server.object_detector import ObjectDetector
-from server.perimeter import build_mask, denormalize, load_perimeter, point_inside_perimeter
-
-WARM_UP_FRAMES = 30
-MOTION_THRESHOLD_AREA = 500
-CONFIDENCE_THRESHOLD = 0.26  # calibrado nos testes anteriores -- ajuste se precisar
+from server.perimeter import build_mask, denormalize, load_perimeter, person_in_perimeter
 
 
 def main() -> None:
@@ -77,7 +78,7 @@ def main() -> None:
                 pessoas = object_detector.detect_people(frame)
                 for pessoa in pessoas:
                     x1, y1, x2, y2 = pessoa["box"]
-                    dentro = point_inside_perimeter(pessoa["foot_point"], polygon_px)
+                    dentro = person_in_perimeter(pessoa["box"], pessoa["foot_point"], polygon_px)
                     cor = (0, 0, 255) if dentro else (0, 200, 0)
 
                     cv2.rectangle(exibicao, (x1, y1), (x2, y2), cor, 2)

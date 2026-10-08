@@ -80,8 +80,8 @@ Sobre a versão do OpenCV: o OpenCV 5.0 removeu o suporte a modelos Caffe, que �
 | `object_detector.py` | Detecta pessoas com limiar 0.26 | Webcam real (`test_object.py`) |
 | Perímetro + detecção de pessoas | **Não funcional** | Ver problema 1 |
 | `event_recorder.py` | Passou em teste sintético, **não captura no pipeline real** | Ver problema 2 |
-| `app.py` | Esqueleto (apenas TODOs) | — |
-| `notifier.py` | Esqueleto (apenas TODOs) | — |
+| `app.py` | Implementado (08/10), validado só com câmera simulada | Rodar com a webcam |
+| `notifier.py` | Implementado (08/10), validado só com `requests` simulado | Testar com o bot real |
 | `client/` | Esqueleto (apenas TODOs) | — |
 
 ### Problemas conhecidos
@@ -122,8 +122,9 @@ safeguard/
 │   ├── motion_detector.py  # estágio 1: movimento (MOG2)
 │   ├── object_detector.py  # estágio 2: pessoas (MobileNet-SSD)
 │   ├── event_recorder.py   # grava as ~5 imagens de um evento
-│   ├── notifier.py         # envio ao Telegram (esqueleto)
-│   ├── app.py              # servidor Flask e loop principal (esqueleto)
+│   ├── notifier.py         # envio ao Telegram
+│   ├── app.py              # servidor Flask e rotas da API
+│   ├── pipeline.py         # loop principal em thread (movimento → pessoas → evento)
 │   │
 │   ├── list_cameras.py     # diagnóstico: descobre o índice da webcam
 │   ├── test_camera.py      # diagnóstico: confirma que a câmera abre

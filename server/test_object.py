@@ -22,10 +22,9 @@ Uso (a partir da raiz do projeto, com o venv ativado):
 import cv2
 
 from server.camera import Camera
+from server.config import CONFIDENCE_THRESHOLD
 from server.object_detector import ObjectDetector
-from server.perimeter import build_mask, denormalize, load_perimeter, point_inside_perimeter
-
-CONFIDENCE_THRESHOLD = 0.26
+from server.perimeter import build_mask, denormalize, load_perimeter, person_in_perimeter
 
 
 def main() -> None:
@@ -57,7 +56,7 @@ def main() -> None:
             for pessoa in pessoas:
                 x1, y1, x2, y2 = pessoa["box"]
                 dentro = (
-                    point_inside_perimeter(pessoa["foot_point"], polygon_px)
+                    person_in_perimeter(pessoa["box"], pessoa["foot_point"], polygon_px)
                     if polygon_px is not None
                     else True
                 )

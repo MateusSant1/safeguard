@@ -16,11 +16,10 @@ Uso (a partir da raiz do projeto, com o venv ativado):
 import cv2
 
 from server.camera import Camera
+from server.config import MOTION_THRESHOLD_AREA, WARM_UP_FRAMES
 from server.motion_detector import MotionDetector
 from server.perimeter import build_mask, denormalize, load_perimeter
 
-WARM_UP_FRAMES = 30
-THRESHOLD_AREA = 500  # ajuste este valor conforme o resultado na prática
 
 
 def main() -> None:
@@ -28,7 +27,7 @@ def main() -> None:
         largura, altura = cam.get_dimensions()
         print(f"Câmera aberta: {largura}x{altura}")
 
-        detector = MotionDetector(threshold_area=THRESHOLD_AREA)
+        detector = MotionDetector(threshold_area=MOTION_THRESHOLD_AREA)
 
         print(f"Aquecendo o detector com {WARM_UP_FRAMES} frames -- não se mexa na frente da câmera...")
         frames_aquecimento = [cam.read_frame() for _ in range(WARM_UP_FRAMES)]

@@ -15,7 +15,7 @@ import logging
 import cv2
 import numpy as np
 
-from server.config import PERIMETER_FILE
+from server.config import DECISION_MODE, MIN_OVERLAP_RATIO, PERIMETER_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -110,3 +110,44 @@ def build_mask(polygon_px: np.ndarray, frame_width: int, frame_height: int) -> n
     mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
     cv2.fillPoly(mask, [polygon_px], color=255)
     return mask
+
+
+def box_overlap_ratio(box: tuple[int, int, int, int], polygon_px: np.ndarray) -> float:
+    """
+    Fração (0.0-1.0) da área da caixa (x1, y1, x2, y2) que cai dentro do
+    polígono. Desenha o polígono num canvas do tamanho da caixa e conta os
+    pixels preenchidos -- barato, porque a caixa é pequena.
+    """
+    x1, y1, x2, y2 = box
+    w, h = x2 - x1, y2 - y1
+    if w <= 0 or h <= 0:
+        return 0.0
+    canvas = np.zeros((h, w), dtype=np.uint8)
+    shifted = (polygon_px - np.array([x1, y1], dtype=np.int32)).astype(np.int32)
+    cv2.fillPoly(canvas, [shifted], color=1)
+    return float(cv2.countNonZero(canvas)) / float(w * h)
+
+
+def person_in_perimeter(
+    box: tuple[int, int, int, int],
+    foot_point: tuple[int, int],
+    polygon_px: np.ndarray,
+    mode: str = DECISION_MODE,
+    min_overlap_ratio: float = MIN_OVERLAP_RATIO,
+) -> bool:
+    """
+    Decide se uma pessoa detectada está dentro do perímetro.
+
+    O modelo às vezes enquadra só a parte de cima do corpo; nesse caso o
+    foot_point (base da caixa) fica na altura do peito e não representa onde
+    a pessoa está. Por isso há três critérios, escolhidos em config.DECISION_MODE
+    (ver config.py): "foot", "center" e "overlap".
+    """
+    if mode == "foot":
+        return point_inside_perimeter(foot_point, polygon_px)
+    if mode == "center":
+        x1, y1, x2, y2 = box
+        return point_inside_perimeter(((x1 + x2) / 2, (y1 + y2) / 2), polygon_px)
+    if mode == "overlap":
+        return box_overlap_ratio(box, polygon_px) >= min_overlap_ratio
+    raise ValueError(f"DECISION_MODE inválido: {mode!r} (use foot, center ou overlap).")
