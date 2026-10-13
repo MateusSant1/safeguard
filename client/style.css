@@ -67,6 +67,26 @@ section {
   width: 100%;
   height: auto;
 }
+/* O quadro do perímetro tem tamanho próprio (4:3 até a imagem chegar; depois
+   a proporção real da câmera, ajustada no perimeter.js). Assim o canvas nunca
+   fica com 0 px quando o /snapshot demora ou falha. */
+#perimetro-section .quadro { aspect-ratio: 4 / 3; }
+#perimetro-section .quadro img { height: 100%; }
+#perimetro-section .quadro img.sem-imagem { visibility: hidden; }
+.quadro .aviso-imagem {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bbb;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+.quadro .aviso-imagem[hidden] { display: none; }
 #perimetro-canvas {
   position: absolute;
   inset: 0;

@@ -17,6 +17,8 @@
   const RAIO_ALCANCE = 14; // distância (px) para "pegar" um vértice
 
   const img = document.getElementById("snapshot");
+  const quadro = img.parentElement;
+  const avisoImagem = document.getElementById("aviso-imagem");
   const canvas = document.getElementById("perimetro-canvas");
   const ctx = canvas.getContext("2d");
   const msg = document.getElementById("perimetro-msg");
@@ -40,21 +42,23 @@
   }
 
   // --- Canvas ----------------------------------------------------------
+  // O tamanho vem do próprio canvas (que cobre o quadro inteiro), e não da
+  // imagem: se o /snapshot ainda não chegou, o perímetro continua visível.
   function ajustarCanvas() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(img.clientWidth * dpr);
-    canvas.height = Math.round(img.clientHeight * dpr);
+    canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     desenhar();
   }
 
   function paraPixels([x, y]) {
-    return [x * img.clientWidth, y * img.clientHeight];
+    return [x * canvas.clientWidth, y * canvas.clientHeight];
   }
 
   function desenhar() {
-    const w = img.clientWidth;
-    const h = img.clientHeight;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
     ctx.clearRect(0, 0, w, h);
     if (pontos.length === 0) return;
 
@@ -201,18 +205,36 @@
   });
 
   // --- Carga inicial ---------------------------------------------------
+  let tentativas = 0;
+
   function carregarImagem() {
     // Query string evita que o navegador reaproveite um snapshot antigo.
     img.src = "/snapshot?t=" + Date.now();
   }
 
-  img.addEventListener("load", ajustarCanvas);
+  img.addEventListener("load", () => {
+    tentativas = 0;
+    img.classList.remove("sem-imagem");
+    avisoImagem.hidden = true;
+    // O quadro passa a ter a proporção real da câmera, para os pontos
+    // normalizados baterem com a imagem.
+    if (img.naturalWidth && img.naturalHeight) {
+      quadro.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+    }
+    ajustarCanvas();
+  });
   img.addEventListener("error", () => {
     // 503 = o pipeline ainda não tem frame; tenta de novo em instantes.
-    mostrar("Aguardando imagem da câmera...", "pendente");
-    setTimeout(carregarImagem, 1500);
+    tentativas += 1;
+    img.classList.add("sem-imagem");
+    avisoImagem.hidden = false;
+    avisoImagem.textContent =
+      tentativas < 5
+        ? "Carregando imagem da câmera..."
+        : `Sem imagem da câmera (tentativa ${tentativas}). Abra /snapshot em outra aba para ver o erro.`;
+    setTimeout(carregarImagem, Math.min(1500 * tentativas, 10000));
   });
-  new ResizeObserver(ajustarCanvas).observe(img);
+  new ResizeObserver(ajustarCanvas).observe(canvas);
 
   async function carregarPerimetro() {
     try {
