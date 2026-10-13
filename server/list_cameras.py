@@ -4,9 +4,11 @@ comum ter mais de um dispositivo de vídeo registrado (câmeras virtuais de
 Zoom, Teams, OBS etc.), então nem sempre o índice 0 é a sua webcam física.
 
 Uso:
-    python server/list_cameras.py
+    python -m server.list_cameras
 """
 import cv2
+
+from server.camera import open_capture
 
 MAX_INDEX_TO_TRY = 5
 
@@ -15,7 +17,7 @@ def main() -> None:
     encontrados = []
 
     for index in range(MAX_INDEX_TO_TRY + 1):
-        cap = cv2.VideoCapture(index)
+        cap = open_capture(index)
         if not cap.isOpened():
             cap.release()
             continue

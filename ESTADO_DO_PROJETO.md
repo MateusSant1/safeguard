@@ -208,7 +208,7 @@ Sem token, explica como criar o bot no @BotFather; com token e sem chat_id, list
 Todos os scripts são executados **da raiz do projeto** e **como módulo** (com `-m` e ponto no lugar da barra). Rodar como arquivo (`python server/test_motion.py`) quebra os imports do pacote `server`.
 
 ```powershell
-python server/list_cameras.py          # descobrir o índice da webcam
+python -m server.list_cameras          # descobrir o índice da webcam
 python -m server.test_integration      # câmera + perímetro, gera test_perimetro.jpg
 python -m server.test_motion           # movimento ao vivo ('m' alterna modo, 'q' sai)
 python -m server.test_object           # pessoas ao vivo

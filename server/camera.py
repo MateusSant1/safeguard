@@ -6,13 +6,40 @@ por aqui, para que trocar de câmera (webcam USB -> câmera do Pi, por
 exemplo) signifique mexer em um arquivo só.
 """
 import logging
+import sys
 
 import cv2
 import numpy as np
 
-from server.config import CAMERA_INDEX
+from server.config import CAMERA_FOURCC, CAMERA_HEIGHT, CAMERA_INDEX, CAMERA_WIDTH
 
 logger = logging.getLogger(__name__)
+
+
+def open_capture(index: int) -> cv2.VideoCapture:
+    """
+    Abre o dispositivo já configurado. No Linux (Raspberry Pi) força o backend
+    V4L2: o OpenCV do apt tenta o GStreamer primeiro, e ele falha com várias
+    webcams ("cannot capture in the specified format"). Em outros sistemas
+    mantém o backend padrão.
+
+    Também é usada pelo list_cameras.py -- por isso fica fora da classe.
+    """
+    if sys.platform.startswith("linux"):
+        cap = cv2.VideoCapture(index, cv2.CAP_V4L2)
+    else:
+        cap = cv2.VideoCapture(index)
+
+    if cap.isOpened():
+        # A ordem importa no V4L2: formato primeiro, depois resolução.
+        if CAMERA_FOURCC:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*CAMERA_FOURCC[:4].ljust(4)))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        # Buffer de 1 frame: no Pi a detecção é lenta, e sem isso o pipeline
+        # processaria imagens de alguns segundos atrás.
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    return cap
 
 
 class Camera:
@@ -22,15 +49,20 @@ class Camera:
 
     def start(self) -> None:
         """Abre a captura de vídeo. Levanta RuntimeError se falhar."""
-        self._cap = cv2.VideoCapture(self._index)
+        self._cap = open_capture(self._index)
         if not self._cap.isOpened():
             self._cap = None
-            raise RuntimeError(
-                f"Não foi possível abrir a câmera de índice {self._index}. "
-                "Verifique se ela está conectada (ls /dev/video* no Linux) "
+            dica = (
+                "Rode 'v4l2-ctl --list-devices' para achar a webcam, confira se o "
+                "usuário está no grupo video ('groups') e ajuste CAMERA_INDEX no .env."
+                if sys.platform.startswith("linux")
+                else "Verifique se ela está conectada, se outro programa a está usando "
                 "e se CAMERA_INDEX está correto."
             )
-        logger.info("Câmera %s aberta com sucesso.", self._index)
+            raise RuntimeError(f"Não foi possível abrir a câmera de índice {self._index}. {dica}")
+
+        largura, altura = self.get_dimensions()
+        logger.info("Câmera %s aberta: %dx%d.", self._index, largura, altura)
 
     def read_frame(self) -> np.ndarray | None:
         """Retorna o frame mais recente (numpy array BGR) ou None se falhar."""

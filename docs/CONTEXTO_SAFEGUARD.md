@@ -245,7 +245,7 @@ python -m venv .venv
 pip install -r requirements.txt
 python scripts/verificar_ambiente.py
 
-python server/list_cameras.py          # índice da webcam
+python -m server.list_cameras          # índice da webcam
 python -m server.test_integration      # câmera + perímetro (gera test_perimetro.jpg)
 python -m server.test_motion           # movimento ao vivo ('m' alterna perímetro/imagem inteira, 'q' sai)
 python -m server.test_object           # pessoas ao vivo
@@ -1138,7 +1138,7 @@ comum ter mais de um dispositivo de vídeo registrado (câmeras virtuais de
 Zoom, Teams, OBS etc.), então nem sempre o índice 0 é a sua webcam física.
 
 Uso:
-    python server/list_cameras.py
+    python -m server.list_cameras
 """
 import cv2
 

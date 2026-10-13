@@ -16,6 +16,12 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # --- Câmera ---
 CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
+# Resolução e formato pedidos à webcam. MJPG comprime na própria câmera, o que
+# alivia o USB 2.0 do Pi 3; se a webcam não suportar, o driver usa o que tiver.
+# Deixe CAMERA_FOURCC vazio para não pedir formato nenhum.
+CAMERA_WIDTH = int(os.getenv("CAMERA_WIDTH", "640"))
+CAMERA_HEIGHT = int(os.getenv("CAMERA_HEIGHT", "480"))
+CAMERA_FOURCC = os.getenv("CAMERA_FOURCC", "MJPG")
 
 # --- Modelo de detecção (MobileNet-SSD) ---
 MODEL_PROTOTXT = BASE_DIR / "models" / "MobileNetSSD_deploy.prototxt"

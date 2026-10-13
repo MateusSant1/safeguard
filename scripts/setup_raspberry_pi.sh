@@ -191,7 +191,7 @@ Instalação concluída.
 
 Próximos passos (a partir de $PROJECT_DIR):
   source .venv/bin/activate
-  python server/list_cameras.py          # descobre o índice da webcam
+  python -m server.list_cameras          # descobre o índice da webcam
   python -m server.test_integration      # gera test_perimetro.jpg
 Os testes com janela (test_motion, test_object, test_pipeline) precisam de
 monitor ligado ao Pi; pelo SSH eles não abrem a janela.

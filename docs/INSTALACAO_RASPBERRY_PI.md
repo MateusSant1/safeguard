@@ -198,7 +198,7 @@ Sempre a partir da pasta do projeto, com o ambiente ativo:
 ```bash
 cd ~/safeguard
 source .venv/bin/activate
-python server/list_cameras.py          # descobre o índice da webcam e salva camera_N.jpg
+python -m server.list_cameras          # descobre o índice da webcam e salva camera_N.jpg
 python -m server.test_integration      # câmera + perímetro; salva test_perimetro.jpg
 ```
 
