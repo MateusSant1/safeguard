@@ -7,6 +7,7 @@ exemplo) signifique mexer em um arquivo só.
 """
 import logging
 import sys
+import time
 
 import cv2
 import numpy as np
@@ -14,6 +15,10 @@ import numpy as np
 from server.config import CAMERA_FOURCC, CAMERA_HEIGHT, CAMERA_INDEX, CAMERA_WIDTH
 
 logger = logging.getLogger(__name__)
+
+# Leituras falhas seguidas antes de fechar e reabrir o dispositivo (ex.: a
+# webcam caiu e voltou no USB, o que acontece com fonte fraca no Pi).
+FAILURES_BEFORE_REOPEN = 10
 
 
 def open_capture(index: int) -> cv2.VideoCapture:
@@ -46,6 +51,7 @@ class Camera:
     def __init__(self, index: int = CAMERA_INDEX):
         self._index = index
         self._cap: cv2.VideoCapture | None = None
+        self._failures = 0
 
     def start(self) -> None:
         """Abre a captura de vídeo. Levanta RuntimeError se falhar."""
@@ -69,11 +75,42 @@ class Camera:
         if self._cap is None:
             raise RuntimeError("A câmera não foi iniciada. Chame start() primeiro.")
 
-        ok, frame = self._cap.read()
-        if not ok:
-            logger.warning("Falha ao ler frame da câmera %s.", self._index)
+        try:
+            ok, frame = self._cap.read()
+        except cv2.error as e:
+            # Quadro MJPEG vazio/corrompido: o OpenCV lança erro no imdecode
+            # em vez de devolver ok=False. Tratamos como uma leitura falha.
+            ok, frame = False, None
+            if self._failures == 0:
+                logger.warning(
+                    "Quadro corrompido da câmera %s (%s).",
+                    self._index, str(e).strip().splitlines()[-1],
+                )
+
+        if not ok or frame is None:
+            if self._failures == 0:
+                logger.warning("Falha ao ler frame da câmera %s.", self._index)
+            self._failures += 1
+            if self._failures % FAILURES_BEFORE_REOPEN == 0:
+                self._reopen()
             return None
+
+        if self._failures:
+            logger.info("Câmera %s voltou após %d leitura(s) falha(s).", self._index, self._failures)
+            self._failures = 0
         return frame
+
+    def _reopen(self) -> None:
+        logger.warning(
+            "Câmera %s: %d falhas seguidas, reabrindo o dispositivo...",
+            self._index, self._failures,
+        )
+        if self._cap is not None:
+            self._cap.release()
+        time.sleep(1.0)  # dá tempo de o USB reenumerar a webcam
+        self._cap = open_capture(self._index)
+        if not self._cap.isOpened():
+            logger.error("Câmera %s não reabriu; nova tentativa em breve.", self._index)
 
     def get_dimensions(self) -> tuple[int, int]:
         """Retorna (largura, altura) reportadas pela câmera."""
